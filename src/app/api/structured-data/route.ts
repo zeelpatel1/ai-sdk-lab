@@ -1,23 +1,42 @@
-import { streamObject } from "ai";
+import { generateObject } from "ai";
 import { NextRequest, NextResponse } from "next/server";
+import { resumeSchema } from "./schema";
 import { google } from "@ai-sdk/google";
-import { pokemonSchema } from "./schema";
 
-export async function POST(req:NextRequest){
+async function POST(req:NextRequest){
+
+    const body = await req.json();
+
+    const { name, email, phone, summary, skills, experience } = body;
+
     try {
-        const {type}=await req.json()
-
-        const res=streamObject({
+        const result=await generateObject({
             model:google("gemini-2.5-flash"),
-            schema:pokemonSchema,
-            output:"array",
-            prompt:`Generate list of 5 ${type} type pokemon`
+            schema:resumeSchema,
+            prompt: `
+        Create a professional resume using the following details:
+
+        Name: ${name}
+        Email: ${email}
+        Phone: ${phone}
+        Summary: ${summary}
+        Skills: ${skills?.join(", ")}
+
+        Experience:
+        ${experience
+          ?.map(
+            (exp: any) =>
+              `Company: ${exp.company}
+               Role: ${exp.role}
+               Duration: ${exp.duration}
+               Description: ${exp.description}`
+          )
+          .join("\n")}
+      `,
         })
-
-        return res.toTextStreamResponse()
-
+        return NextResponse.json({resume:result.object})
     } catch (error) {
-        console.error("Error generating Task", error);
-        return NextResponse.json({ error: "Failed to generate task" }, { status: 500 });
+        console.error(error);
+        return new Response("Something went wrong", { status: 500 });
     }
 }
